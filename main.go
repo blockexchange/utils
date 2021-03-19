@@ -2,8 +2,8 @@ package main
 
 import (
 	"bytes"
-	"compress/flate"
 	"compress/gzip"
+	"compress/zlib"
 	"fmt"
 	"io"
 	"log"
@@ -30,15 +30,13 @@ func GzipToDeflate(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	buf := bytes.NewBuffer([]byte{})
-	w, err := flate.NewWriter(buf, 3)
-	if err != nil {
-		return nil, err
-	}
+	w := zlib.NewWriter(buf)
 
 	_, err = io.Copy(w, r)
 	if err != nil {
 		return nil, err
 	}
+	w.Close()
 
 	return buf.Bytes(), nil
 }

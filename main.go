@@ -41,6 +41,57 @@ func GzipToDeflate(data []byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func Gunzip(data []byte) ([]byte, error) {
+	r, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer([]byte{})
+
+	_, err = io.Copy(buf, r)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func Deflate(data []byte) ([]byte, error) {
+	buf := bytes.NewBuffer([]byte{})
+	w := zlib.NewWriter(buf)
+	r := bytes.NewReader(data)
+
+	_, err := io.Copy(w, r)
+	if err != nil {
+		return nil, err
+	}
+	w.Close()
+
+	return buf.Bytes(), nil
+}
+
+func ConvertMapblockData(data []byte) {
+	size := len(data) / 4
+	for i := 0; i < size; i++ {
+		node_id_low := data[(i*2)+0]
+		node_id_high := data[(i*2)+1]
+		param1 := data[(2*size)+i]
+		param2 := data[(3*size)+i]
+
+		var node_id = uint(node_id_low) + (uint(node_id_high) * 256)
+		node_id += 32768
+
+		node_id_low_new := byte(node_id % 256)
+		node_id_high_new := byte((node_id - uint(node_id_low_new)) / 256)
+
+		data[(i*2)+0] = node_id_high_new
+		data[(i*2)+1] = node_id_low_new
+
+		data[(2*size)+i] = param1 - 0x80
+		data[(3*size)+i] = param2 - 0x80
+	}
+}
+
 func main() {
 	// setup db connection
 	connStr := fmt.Sprintf(
@@ -73,7 +124,12 @@ func main() {
 	for _, schemapart := range list {
 		log.Printf("Converting part id=%d", schemapart.ID)
 
-		data, err := GzipToDeflate(schemapart.Data)
+		data, err := Gunzip(schemapart.Data)
+		if err != nil {
+			panic(err)
+		}
+		ConvertMapblockData(data)
+		deflated_data, err := Deflate(data)
 		if err != nil {
 			panic(err)
 		}
@@ -89,7 +145,7 @@ func main() {
 			where id = $1
 		`
 		// insert re-compressed data and metadata again
-		_, err = DB.Exec(query, schemapart.ID, data, metadata)
+		_, err = DB.Exec(query, schemapart.ID, deflated_data, metadata)
 		if err != nil {
 			panic(err)
 		}

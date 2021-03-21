@@ -71,6 +71,9 @@ func Deflate(data []byte) ([]byte, error) {
 }
 
 func ConvertMapblockData(data []byte) {
+	if len(data)%4 != 0 {
+		panic("mapblock data not aligned")
+	}
 	size := len(data) / 4
 	for i := 0; i < size; i++ {
 		node_id_low := data[(i*2)+0]
@@ -87,8 +90,8 @@ func ConvertMapblockData(data []byte) {
 		data[(i*2)+0] = node_id_high_new
 		data[(i*2)+1] = node_id_low_new
 
-		data[(2*size)+i] = param1 - 0x80
-		data[(3*size)+i] = param2 - 0x80
+		data[(2*size)+i] = param1 + 0x80
+		data[(3*size)+i] = param2 + 0x80
 	}
 }
 
